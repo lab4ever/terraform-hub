@@ -21,10 +21,6 @@ pipeline {
             choices: ['us-east-1'],
             description: 'Amazon region',
             name: 'REGION')
-        choice(
-            choices: ['develop','staging','production'],
-            description: 'Envirnonment',
-            name: 'TIER')
     }
 
     environment {
