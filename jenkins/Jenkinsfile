@@ -12,34 +12,119 @@ pipeline {
         }
     }
 
+    parameters {
+        choice(
+            choices: ['output' , 'plan' , 'apply' , 'show', 'preview-destroy' , 'destroy'],
+            description: 'Terraform action',
+            name: 'ACTION')
+        choice(
+            choices: ['us-east-1','sa-east-1'],
+            description: 'Amazon region',
+            name: 'REGION')
+        choice(
+            choices: ['develop','staging','production'],
+            description: 'Envirnonment',
+            name: 'TIER')
+    }
+
+    environment {
+        BACKEND_KEY = "hub"
+    }
+
     stages {
         stage('init') {
             steps {
                 checkout scm
 
                 sh """
-                cd organization/terraform/hub
-                terraform init
+                terraform init -reconfigure \
+                -backend-config="key=${BACKEND_KEY}/${REGION}/terraform.tfstate" \
+                -backend-config="bucket=${BACKEND_BUCKET}" \
+                -backend-config="kms_key_id=${BACKEND_KMS_KEY}" \
+                -backend-config="region=${BACKEND_REGION}" \
+                -backend-config="encrypt=true"
                 """
             }
         }
-        stage('plan') {
+
+        stage('validate') {
             steps {
                 sh """
-                cd organization/terraform/hub
-                terraform plan -var-file=../conf/us-east-1-hub.tfvars -var-file=../conf/global.tfvars -out=.terraform-hub.plan
+                terraform validate -var-file=./conf/${REGION}-hub.tfvars -var-file=./conf/global.tfvars
+                """
+            }
+        }
+
+        stage('plan') {
+            when {
+                expression { params.ACTION == 'plan' }
+            }
+            steps {
+                sh """
+                terraform plan -var-file=./conf/${REGION}-hub.tfvars -var-file=./conf/global.tfvars -out=.terraform.plan
                 """
             }
         }
 
         stage('apply') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
             steps {
+                sh 'terraform plan -var-file=./conf/${REGION}-hub.tfvars -var-file=./conf/global.tfvars -out=.terraform.plan'
                 script {
-                def userInput = input(id: 'confirm', message: 'Apply deploy?', parameters: [ [$class: 'BooleanParameterDefinition', defaultValue: false, description: 'Continuos deploy', name: 'confirm'] ])
+                    def userInput = input(id: 'confirm', message: 'Apply deploy?', parameters: [ [$class: 'BooleanParameterDefinition', defaultValue: false, description: 'Continuos deploy', name: 'confirm'] ])
                 }
                 sh """
-                cd organization/terraform/hub
-                terraform apply .terraform-hub.plan
+                terraform apply .terraform.plan
+                """
+            }
+        }
+
+        stage('preview-destroy') {
+            when {
+                expression { params.ACTION == 'preview-destroy' }
+            }
+            steps {
+                sh """
+                terraform plan -destroy -var-file=./conf/${REGION}-hub.tfvars -var-file=./conf/global.tfvars
+                """
+            }
+        }
+
+        stage('destroy') {
+            when {
+                expression { params.ACTION == 'destroy' }
+            }
+            steps {
+                sh 'terraform plan -destroy -var-file=./conf/${REGION}-hub.tfvars -var-file=./conf/global.tfvars -out=.destroy.plan'
+                script {
+                    def userInput = input(id: 'confirm', message: 'Apply deploy?', parameters: [ [$class: 'BooleanParameterDefinition', defaultValue: false, description: 'Continuos deploy', name: 'confirm'] ])
+                }
+                sh """
+                terraform apply .destroy.plan
+                """
+            }
+        }
+
+        stage('show') {
+            when {
+                expression { params.ACTION == 'show' }
+            }
+            steps {
+                sh """
+                terraform show -no-color
+                """
+            }
+        }
+
+        stage('output') {
+            when {
+                expression { params.ACTION == 'output' }
+            }
+            steps {
+                sh """
+                terraform output -json
                 """
             }
         }
