@@ -18,7 +18,7 @@ pipeline {
             description: 'Terraform action',
             name: 'ACTION')
         choice(
-            choices: ['us-east-1','sa-east-1'],
+            choices: ['us-east-1'],
             description: 'Amazon region',
             name: 'REGION')
         choice(
@@ -38,7 +38,7 @@ pipeline {
 
                 sh """
                 terraform init -reconfigure \
-                -backend-config="key=${BACKEND_KEY}/${REGION}/terraform.tfstate" \
+                -backend-config="key=${BACKEND_KEY}/terraform.tfstate" \
                 -backend-config="bucket=${BACKEND_BUCKET}" \
                 -backend-config="kms_key_id=${BACKEND_KMS_KEY}" \
                 -backend-config="region=${BACKEND_REGION}" \
