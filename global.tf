@@ -10,7 +10,6 @@ data "aws_availability_zones" "available" {}
 
 locals {
   common_tags = {
-    Versao  = 12
     Terraform    = "true"
     Organization = "${var.organization}"
   }
